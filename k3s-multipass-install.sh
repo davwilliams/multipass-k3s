@@ -2,79 +2,80 @@
 
 # -------------------------------------------------------------------------------------
 # Script: k3s-multipass-install.sh
-# Author: David Williams (david.williams@thinkahead.com)
-#
 # Highly functional K3s lab for Linux or macOS via Ubuntu Multipass
 #
 # Usage:
-# ./k3s-multipass-install.sh -w <num_workers> -c <num_cpus> -m <mem_size -d <disk_size>
+# ./k3s-multipass-install.sh -w <num_agents> -c <num_cpus> -m <mem_size -d <disk_size>
 #
 # Example:
 # ./k3s-multipass-install.sh -w 3 -c 2 -m 4096 -d 20
 #
-# ToDo: Error handling
+# ToDo: Error handling, support for advanced server and agent customizations
 #
 # Governed under the MIT license. 
 # -------------------------------------------------------------------------------------
 
 while getopts w:c:m:d: flag; do
   case "${flag}" in
-    w) NUM_WORKERS=${OPTARG};;
+    w) NUM_agentS=${OPTARG};;
     c) NUM_CPUS=${OPTARG};;
     m) MEM_SIZE=${OPTARG};;
     d) DISK_SIZE=${OPTARG};;
   esac
 done
 
-deploy_workers () {
+provision_agents () {
     COUNTER=1
-    until [ $COUNTER -eq $NUM_WORKERS ]; do
-      multipass launch --name k3s-worker-$COUNTER --cpus $NUM_CPUS --mem ${MEM_SIZE}M --disk ${DISK_SIZE}G
+    until [ $COUNTER -eq $NUM_agentS ]; do
+      multipass launch focal --name k3s-agent-$COUNTER --cpus $NUM_CPUS --mem ${MEM_SIZE}M --disk ${DISK_SIZE}G
       let COUNTER+=1
     done
 }
 
-install_k3s_workers () {
+install_k3s_agents () {
     COUNTER=1
-    until [ $COUNTER -eq $NUM_WORKERS ]; do
-      echo && multipass exec k3s-worker-$COUNTER \
-        -- /bin/bash -c "curl -sfL https://get.k3s.io | K3S_TOKEN=${K3S_TOKEN} K3S_URL=${K3S_NODEIP_manager} sh -"
+    until [ $COUNTER -eq $NUM_agentS ]; do
+      echo && multipass exec k3s-agent-$COUNTER \
+        -- /bin/bash -c "curl -sfL https://get.k3s.io | K3S_TOKEN=${K3S_TOKEN} K3S_URL=${K3S_NODEIP_SERVER} sh -"
       let COUNTER+=1
     done
 }
 
-# Deploy K3s manager and two K3s Workers nodes
+# Provision nodes for K3s server, Rancher management server, and Minio object storage
 echo "Lauching K3s lab nodes..."
-multipass launch --name k3s-manager --cpus 2 --mem 4096M --disk 20G
-deploy_workers
-multipass launch --name rancher --cpus 2 --mem 4096M --disk 5G
-multipass launch --name minio --cpus 1 --mem 2048M --disk 25G
+multipass launch focal --name k3s-server --cpus 2 --mem 4096M --disk 20G
+multipass launch focal --name rancher --cpus 2 --mem 4096M --disk 20G
+multipass launch focal --name minio --cpus 1 --mem 2048M --disk 25G
 
+# Provision nodes for K3s agent nodes
+provision_agents
 
 # K3s Installation
-# Note: This script installs a statically defined three-node cluster with the following attributes:
-#       - Single-manager, two workers
-#       - sqlite DB backend (via Kine)
+# Note: This script installs a dynamically-defined cluster with the following attributes:
+#       - Single-server (non-HA)
+#       - sqlite DB backend (via Kine, also non-HA)
+#       - Flannel CNI with default configuration (VXLAN backend)
 
-# Deploy K3s on Manager node
-echo && echo "Deploying latest release of K3s on the Manager node..."
-multipass exec k3s-manager -- /bin/bash -c "curl -sfL https://get.k3s.io | K3S_KUBECONFIG_MODE="644" sh -"
 
-# Prep for deployment on Workers
-echo && echo "Retrieving information preparatory to deploying K3s to the Worker nodes..."
-K3S_NODEIP_manager="https://$(multipass info k3s-manager | grep "IPv4" | awk -F' ' '{print $2}'):6443"
-echo "  k3s-manager IP is: " $K3S_NODEIP_manager
-K3S_TOKEN="$(multipass exec k3s-manager -- /bin/bash -c "sudo cat /var/lib/rancher/k3s/server/node-token")"
+# Deploy K3s on Server node
+echo && echo "Deploying latest release of K3s on the Server node..."
+multipass exec k3s-server -- /bin/bash -c "curl -sfL https://get.k3s.io | K3S_KUBECONFIG_MODE="644" sh -"
+
+# Prep for deployment on agents
+echo && echo "Retrieving information preparatory to deploying K3s to the agent nodes..."
+K3S_NODEIP_SERVER="https://$(multipass info k3s-server | grep "IPv4" | awk -F' ' '{print $2}'):6443"
+echo "  k3s-server IP is: " $K3S_NODEIP_server
+K3S_TOKEN="$(multipass exec k3s-server -- /bin/bash -c "sudo cat /var/lib/rancher/k3s/server/node-token")"
 echo "  Join token for this K3s cluster is: " $K3S_TOKEN
 
-# Deploy K3s on Worker nodes
-echo && echo "Deploying K3s on the Worker nodes..."
-install_k3s_workers
+# Deploy K3s on agent nodes
+echo && echo "Deploying K3s on the agent nodes..."
+install_k3s_agents
 
 # Check cluster status
 echo && echo "Verifying cluster status..."
-sleep 15
-multipass exec k3s-manager kubectl get nodes
+sleep 20  # Give enough time for agend nodes to become ready
+multipass exec k3s kubectl get nodes -o wide
 
 # Install Rancher
 echo && echo "Installing Rancher Server..."
