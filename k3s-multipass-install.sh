@@ -17,7 +17,7 @@
 
 while getopts w:c:m:d: flag; do
   case "${flag}" in
-    w) NUM_agentS=${OPTARG};;
+    w) NUM_AGENTS=${OPTARG};;
     c) NUM_CPUS=${OPTARG};;
     m) MEM_SIZE=${OPTARG};;
     d) DISK_SIZE=${OPTARG};;
@@ -26,7 +26,7 @@ done
 
 provision_agents () {
     COUNTER=1
-    until [ $COUNTER -eq $NUM_agentS ]; do
+    until [ $COUNTER -eq $NUM_AGENTS ]; do
       multipass launch focal --name k3s-agent-$COUNTER --cpus $NUM_CPUS --mem ${MEM_SIZE}M --disk ${DISK_SIZE}G
       let COUNTER+=1
     done
@@ -34,7 +34,7 @@ provision_agents () {
 
 install_k3s_agents () {
     COUNTER=1
-    until [ $COUNTER -eq $NUM_agentS ]; do
+    until [ $COUNTER -eq $NUM_AGENTS ]; do
       echo && multipass exec k3s-agent-$COUNTER \
         -- /bin/bash -c "curl -sfL https://get.k3s.io | K3S_TOKEN=${K3S_TOKEN} K3S_URL=${K3S_NODEIP_SERVER} sh -"
       let COUNTER+=1
