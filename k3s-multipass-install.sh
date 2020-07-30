@@ -26,7 +26,7 @@ done
 
 provision_agents () {
     COUNTER=1
-    until [ $COUNTER -eq $NUM_AGENTS ]; do
+    until [ $COUNTER -gt $NUM_AGENTS ]; do
       multipass launch focal --name k3s-agent-$COUNTER --cpus $NUM_CPUS --mem ${MEM_SIZE}M --disk ${DISK_SIZE}G
       let COUNTER+=1
     done
@@ -34,7 +34,7 @@ provision_agents () {
 
 install_k3s_agents () {
     COUNTER=1
-    until [ $COUNTER -eq $NUM_AGENTS ]; do
+    until [ $COUNTER -gt $NUM_AGENTS ]; do
       echo && multipass exec k3s-agent-$COUNTER \
         -- /bin/bash -c "curl -sfL https://get.k3s.io | K3S_TOKEN=${K3S_TOKEN} K3S_URL=${K3S_NODEIP_SERVER} sh -"
       let COUNTER+=1
@@ -64,7 +64,7 @@ multipass exec k3s-server -- /bin/bash -c "curl -sfL https://get.k3s.io | K3S_KU
 # Prep for deployment on agents
 echo && echo "Retrieving information preparatory to deploying K3s to the agent nodes..."
 K3S_NODEIP_SERVER="https://$(multipass info k3s-server | grep "IPv4" | awk -F' ' '{print $2}'):6443"
-echo "  k3s-server IP is: " $K3S_NODEIP_server
+echo "  k3s-server IP is: " $K3S_NODEIP_SERVER
 K3S_TOKEN="$(multipass exec k3s-server -- /bin/bash -c "sudo cat /var/lib/rancher/k3s/server/node-token")"
 echo "  Join token for this K3s cluster is: " $K3S_TOKEN
 
