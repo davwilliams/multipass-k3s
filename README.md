@@ -1,4 +1,4 @@
-# k3s-multipass-install
+# multipass-k3s
 
 Highly functional K3s lab for Linux or macOS via Ubuntu Multipass
 
