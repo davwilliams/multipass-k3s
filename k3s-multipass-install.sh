@@ -81,7 +81,7 @@ multipass exec k3s kubectl get nodes -o wide
 echo && echo "Installing Rancher Server..."
 multipass exec rancher -- /bin/bash -c "sudo apt-get update && sudo apt-get install -y docker.io"
 multipass exec rancher -- /bin/bash -c "sudo systemctl enable docker"
-multipass exec rancher -- /bin/bash -c "sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --name rancher -v /opt/rancher:/var/lib/rancher rancher/rancher"
+multipass exec rancher -- /bin/bash -c "sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --name rancher --privileged rancher/rancher"
 
 # Install Minio
 echo && echo "Installing Minio Object Storage server..."
