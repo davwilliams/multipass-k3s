@@ -73,7 +73,7 @@ install_k3s_agents
 # Check cluster status
 echo && echo "Verifying cluster status..."
 sleep 20  # Give enough time for agend nodes to become ready
-multipass exec k3s kubectl get nodes -o wide
+multipass exec k3s-server kubectl get nodes -o wide
 
 # Install Rancher
 echo && echo "Installing Rancher Server..."
