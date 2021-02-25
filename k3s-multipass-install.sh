@@ -45,7 +45,6 @@ install_k3s_agents () {
 echo "Lauching K3s lab nodes..."
 multipass launch focal --name k3s-server --cpus 2 --mem 4096M --disk 20G
 multipass launch focal --name rancher --cpus 2 --mem 4096M --disk 20G
-multipass launch focal --name minio --cpus 1 --mem 2048M --disk 25G
 
 # Provision nodes for K3s agent nodes
 provision_agents
@@ -55,7 +54,6 @@ provision_agents
 #       - Single-server (non-HA)
 #       - sqlite DB backend (via Kine, also non-HA)
 #       - Flannel CNI with default configuration (VXLAN backend)
-
 
 # Deploy K3s on Server node
 echo && echo "Deploying latest release of K3s on the Server node..."
@@ -82,9 +80,3 @@ echo && echo "Installing Rancher Server..."
 multipass exec rancher -- /bin/bash -c "sudo apt-get update && sudo apt-get install -y docker.io"
 multipass exec rancher -- /bin/bash -c "sudo systemctl enable docker"
 multipass exec rancher -- /bin/bash -c "sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --name rancher --privileged rancher/rancher"
-
-# Install Minio
-echo && echo "Installing Minio Object Storage server..."
-multipass exec minio -- /bin/bash -c "sudo apt-get update && sudo apt-get install -y docker.io"
-multipass exec minio -- /bin/bash -c "sudo systemctl enable docker"
-multipass exec minio -- /bin/bash -c "sudo docker run -d --restart=unless-stopped -p 9000:9000 --name minio -v /mnt/data:/data minio/minio server /data"
