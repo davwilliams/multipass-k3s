@@ -44,7 +44,7 @@ install_k3s_agents () {
 # Provision nodes for K3s server, Rancher management server, and Minio object storage
 echo "Lauching K3s lab nodes..."
 multipass launch focal --name k3s-server --cpus 2 --mem 4096M --disk 20G
-multipass launch focal --name rancher --cpus 2 --mem 4096M --disk 20G
+#multipass launch focal --name rancher --cpus 2 --mem 4096M --disk 20G
 
 # Provision nodes for K3s agent nodes
 provision_agents
@@ -73,10 +73,39 @@ install_k3s_agents
 # Check cluster status
 echo && echo "Verifying cluster status..."
 sleep 20  # Give enough time for agend nodes to become ready
-multipass exec k3s-server kubectl get nodes -o wide
+multipass exec k3s-server kubectl get nodes --sort-by={.metadata.labels."kubernetes\.io\/hostname"} -o wide
 
 # Install Rancher
-echo && echo "Installing Rancher Server..."
-multipass exec rancher -- /bin/bash -c "sudo apt-get update && sudo apt-get install -y docker.io"
-multipass exec rancher -- /bin/bash -c "sudo systemctl enable docker"
-multipass exec rancher -- /bin/bash -c "sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --name rancher --privileged rancher/rancher"
+echo && echo "Installing Rancher..."
+
+echo && echo "Installing Helm:"
+multipass exec k3s-server curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+multipass exec k3s-server chmod 700 get_helm.sh
+multipass exec k3s-server ./get_helm.sh
+
+echo && echo "Adding Rancher Helm chart repository:"
+multipass exec k3s-server helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
+
+echo && echo "Creating a namespace for Rancher:"
+multipass exec k3s-server kubectl create namespace cattle-system
+
+echo && echo "Install Cert-Manager:"
+multipass exec k3s-server kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.0.4/cert-manager.crds.yaml
+multipass exec k3s-server kubectl create namespace cert-manager
+multipass exec k3s-server helm repo add jetstack https://charts.jetstack.io
+multipass exec k3s-server helm repo update
+multipass exec k3s-server helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.0.4
+
+echo && echo "Verifying installation of Cert-Manager"
+multipass exec k3s-server kubectl get pods --namespace cert-manager
+
+echo && echo "Installing Rancher with Helm a generated certs:"
+multipass exec k3s-server helm install rancher rancher-latest/rancher --namespace cattle-system --set hostname=rancher.${K3S_NODEIP_SERVER}.xip.io
+multipass exec k3s-server kubectl -n cattle-system rollout status deploy/rancher
+multipass exec k3s-server kubectl -n cattle-system get deploy rancher
+
+echo && echo "Verifying "
+
+# multipass exec rancher -- /bin/bash -c "sudo apt-get update && sudo apt-get install -y docker.io"
+# multipass exec rancher -- /bin/bash -c "sudo systemctl enable docker"
+# multipass exec rancher -- /bin/bash -c "sudo docker run -d --restart=unless-stopped -p 80:80 -p 443:443 --name rancher --privileged rancher/rancher"
